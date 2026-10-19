@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Save Seed · Sistema inteligente de cuidado y riego automatizado</title>
+<meta name="description" content="Save Seed: un jardinero robótico que vigila y riega las plantas de la ecohuerta por sí solo.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🌱</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,700;12..96,800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --forest:#16382a; --leaf:#2f7d4f; --sprout:#a9d96c; --water:#2f86b8; --soil:#4a3322; --heat:#e0833a;
+  --paper:#f2f6ea; --card:#ffffff; --ink:#1b2a22; --muted:#53655b; --line:#d5e0c8;
+  --display:'Bricolage Grotesque',system-ui,sans-serif; --body:'Figtree',system-ui,sans-serif;
+}
+@media (prefers-color-scheme:dark){
+  :root{--paper:#0f1f17; --card:#16291f; --ink:#e7f0e2; --muted:#9db3a5; --line:#264336; --forest:#0a1610}
+}
+*{box-sizing:border-box;margin:0}
+html{scroll-behavior:smooth}
+body{font:17px/1.65 var(--body);color:var(--ink);background:var(--paper)}
+h1,h2,h3{font-family:var(--display);line-height:1.05;letter-spacing:-.02em}
+a{color:inherit}
+:focus-visible{outline:3px solid var(--water);outline-offset:3px}
+.wrap{width:min(1080px,100% - 2.5rem);margin-inline:auto}
+section{padding:5.5rem 0}
+h2{font-size:clamp(2rem,5vw,3.2rem);margin-bottom:1.2rem}
+p{max-width:62ch}
+
+/* nav */
+nav{position:sticky;top:0;z-index:20;background:color-mix(in srgb,var(--paper) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.7rem 0}
+nav b{font-family:var(--display);font-size:1.2rem}
+nav ul{display:flex;gap:1.3rem;list-style:none;padding:0;font-size:.95rem}
+nav a{text-decoration:none;color:var(--muted)}
+nav a:hover{color:var(--leaf)}
+@media(max-width:760px){nav ul{display:none}}
+
+/* hero */
+.hero{background:var(--forest);color:#eaf4e0;padding:4.5rem 0 5rem;position:relative;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.05fr 1fr;gap:3rem;align-items:center}
+.hero h1{font-size:clamp(3.6rem,10vw,7.4rem);font-weight:800;color:var(--sprout);letter-spacing:-.04em}
+.hero .sub{font-family:var(--display);font-size:clamp(1.3rem,3vw,1.9rem);margin:1rem 0 1.4rem;font-weight:400;line-height:1.2}
+.hero p{color:#bcd2c2}
+.team{margin-top:2rem;font-size:.92rem;color:#9fbba8;border-left:3px solid var(--sprout);padding-left:1rem}
+.team strong{color:#eaf4e0;font-weight:600}
+@media(max-width:860px){.hero .wrap{grid-template-columns:1fr}}
+
+/* demo */
+.demo{background:#0e2419;border:1px solid #2b5240;border-radius:22px;padding:1.2rem;color:#eaf4e0}
+.demo h2{font-size:1.15rem;margin:0 0 .2rem;color:#eaf4e0}
+.demo .hint{font-size:.88rem;color:#9fbba8;margin-bottom:.8rem}
+.stage{position:relative;height:210px;border-radius:14px;overflow:hidden;background:linear-gradient(#173a52,#1f4d63 60%,#1f4d63);transition:background .6s}
+.stage.hot{background:linear-gradient(#6a3a1e,#a35a26 70%)}
+.soil{position:absolute;left:0;right:0;bottom:0;height:46%;background:var(--soil);transition:filter .4s}
+.wet{position:absolute;left:0;right:0;bottom:0;background:#2a1c11;transition:height .4s;height:30%}
+.plant{position:absolute;left:50%;bottom:44%;transform:translateX(-50%);transform-origin:50% 100%;transition:transform .6s}
+.plant.dry{transform:translateX(-50%) rotate(14deg) scaleY(.85);filter:saturate(.35) sepia(.4)}
+.pipe{position:absolute;top:12px;left:12px;font-size:.78rem;background:rgba(0,0,0,.35);padding:.3rem .6rem;border-radius:20px}
+.drops{position:absolute;inset:0;pointer-events:none;opacity:0}
+.on .drops{opacity:1}
+.drops i{position:absolute;top:-14px;width:8px;height:14px;background:#6cc4f2;border-radius:50% 50% 50% 50%/60% 60% 40% 40%;animation:fall 0.9s linear infinite}
+.drops i:nth-child(1){left:36%;animation-delay:0s}.drops i:nth-child(2){left:44%;animation-delay:.25s}
+.drops i:nth-child(3){left:52%;animation-delay:.5s}.drops i:nth-child(4){left:60%;animation-delay:.15s}
+.drops i:nth-child(5){left:48%;animation-delay:.7s}
+@keyframes fall{to{transform:translateY(150px);opacity:.2}}
+.fan{position:absolute;right:14px;top:12px;width:44px;height:44px;opacity:.35;transition:opacity .3s}
+.fan.run{opacity:1;animation:spin .5s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.ctrls{display:grid;gap:.7rem;margin-top:1rem}
+.ctrls label{display:flex;justify-content:space-between;font-size:.9rem}
+input[type=range]{width:100%;accent-color:var(--sprout)}
+.chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem}
+.chip{font-size:.85rem;padding:.35rem .8rem;border-radius:20px;background:#173326;color:#9fbba8;transition:.3s}
+.chip.act{background:var(--water);color:#fff}
+.chip.act.h{background:var(--heat)}
+.demo button{margin-top:.9rem;width:100%;padding:.75rem;border:0;border-radius:12px;background:var(--sprout);color:#10281c;font:600 1rem var(--body);cursor:pointer}
+.demo button:hover{filter:brightness(1.08)}
+
+/* problema */
+.problem{background:var(--paper)}
+.problem .wrap{display:grid;grid-template-columns:1fr 1fr;gap:3rem;align-items:center}
+.crops{display:flex;gap:.6rem;flex-wrap:wrap;margin:1.3rem 0}
+.crops span{padding:.35rem .9rem;border:1.5px dashed #b4662f;border-radius:20px;font-weight:500;color:#9b5424}
+.wilt{display:flex;align-items:flex-end;justify-content:center;gap:1.5rem;min-height:260px;background:linear-gradient(#f7e9d6,#ecd2ae);border-radius:26px;padding:1.5rem;position:relative;overflow:hidden}
+@media(prefers-color-scheme:dark){.wilt{background:linear-gradient(#3a2a1b,#2c2016)}.crops span{color:#e5a46d;border-color:#8b5a35}}
+.glass{width:90px}
+.glass .sand{animation:sand 6s linear infinite alternate;transform-origin:50% 100%}
+@keyframes sand{from{transform:scaleY(1)}to{transform:scaleY(.15)}}
+@media(max-width:860px){.problem .wrap{grid-template-columns:1fr}}
+
+/* propuesta */
+.proposal{background:linear-gradient(180deg,#dcebd0,#cfe3dd);color:#14301f}
+@media(prefers-color-scheme:dark){.proposal{background:linear-gradient(180deg,#17302a,#14292e);color:#e7f0e2}}
+.proposal .wrap{display:grid;grid-template-columns:.9fr 1.1fr;gap:3rem;align-items:center}
+.proposal em{font-style:normal;background:linear-gradient(transparent 62%,#a9d96c88 62%);font-weight:600}
+.dome{width:100%;max-width:380px;margin-inline:auto}
+@media(max-width:860px){.proposal .wrap{grid-template-columns:1fr}}
+
+/* como funciona */
+.flow{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;align-items:stretch;gap:1rem;margin-top:2.5rem}
+.step{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:1.6rem}
+.step:nth-child(1){border-top:6px solid var(--water)}
+.step:nth-child(3){border-top:6px solid #c46a8a}
+.step:nth-child(5){border-top:6px solid var(--leaf)}
+.step svg{width:54px;height:54px;margin-bottom:.8rem}
+.step h3{font-size:1.5rem;margin-bottom:.5rem}
+.step p{font-size:.98rem;color:var(--muted)}
+.arrow{align-self:center;font-size:2rem;color:var(--leaf);font-family:var(--display)}
+.arrow::after{content:"";display:block;width:34px;height:3px;background:var(--leaf);position:relative;border-radius:2px}
+@media(max-width:860px){.flow{grid-template-columns:1fr}.arrow{transform:rotate(90deg);justify-self:center;height:34px}}
+
+/* logros */
+.wins{background:var(--forest);color:#eaf4e0}
+.wins h2{color:var(--sprout)}
+.win{display:grid;grid-template-columns:70px 1fr;gap:1.4rem;padding:1.6rem 0;border-top:1px solid #2b5240;align-items:start}
+.win:last-of-type{border-bottom:1px solid #2b5240}
+.win .ic{width:58px;height:58px;border-radius:50%;background:var(--sprout);color:#10281c;display:grid;place-items:center}
+.win h3{font-size:1.6rem;margin-bottom:.3rem}
+.win p{color:#bcd2c2}
+.bars{display:flex;gap:6px;align-items:flex-end;height:60px;margin-top:.9rem}
+.bars i{width:16px;background:var(--sprout);border-radius:3px 3px 0 0;height:var(--h);opacity:.85}
+.months{display:inline-block;margin-top:.8rem;padding:.3rem .9rem;border-radius:20px;background:#173326;font-size:.9rem;color:var(--sprout)}
+
+/* evidencia */
+.proof .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:3rem;align-items:center}
+.proof blockquote{font-family:var(--display);font-size:clamp(1.4rem,3vw,2rem);line-height:1.25;font-weight:700;border-left:6px solid var(--water);padding-left:1.3rem;margin:1.4rem 0}
+.live{display:inline-flex;align-items:center;gap:.5rem;font-weight:600;color:var(--leaf)}
+.live::before{content:"";width:10px;height:10px;border-radius:50%;background:#e24b4b;animation:pulse 1.4s infinite}
+@keyframes pulse{50%{opacity:.25}}
+.timeline{list-style:none;padding:0;border-left:3px solid var(--line);margin-left:.6rem}
+.timeline li{padding:0 0 1.5rem 1.4rem;position:relative}
+.timeline li::before{content:"";position:absolute;left:-10px;top:.35rem;width:17px;height:17px;border-radius:50%;background:var(--card);border:4px solid var(--water)}
+.timeline li:last-child{padding-bottom:0}
+.timeline li:last-child::before{border-color:var(--leaf);background:var(--leaf)}
+@media(max-width:860px){.proof .wrap{grid-template-columns:1fr}}
+
+/* importa */
+.matters{background:linear-gradient(135deg,#fdf0c9,#e7f1c5)}
+@media(prefers-color-scheme:dark){.matters{background:#1b2a1a}}
+.matters .wrap{text-align:center}
+.matters p{margin:0 auto 2rem;font-size:1.15rem}
+.pill-row{display:flex;gap:1rem;flex-wrap:wrap;justify-content:center}
+.pill{background:var(--card);padding:.9rem 1.4rem;border-radius:60px;font-weight:600;box-shadow:0 2px 0 var(--line)}
+
+/* pasos */
+.next .wrap{display:grid;grid-template-columns:1fr 1fr;gap:1.5rem}
+.box{border-radius:22px;padding:2rem}
+.box.lim{background:var(--card);border:2px dashed var(--line)}
+.box.nx{background:var(--leaf);color:#fff}
+.box h3{font-size:1.6rem;margin-bottom:.8rem}
+.box ul{padding-left:1.2rem}
+.box li{margin-bottom:.5rem}
+@media(max-width:760px){.next .wrap{grid-template-columns:1fr}}
+
+footer{background:var(--forest);color:#9fbba8;text-align:center;padding:2.5rem 1rem;font-size:.92rem}
+footer b{color:var(--sprout);font-family:var(--display);font-size:1.2rem}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}html{scroll-behavior:auto}}
+</style>
+</head>
+<body>
+
+<nav><div class="wrap"><b>🌱 Save Seed</b>
+<ul><li><a href="#problema">El problema</a></li><li><a href="#propuesta">Propuesta</a></li><li><a href="#funciona">Cómo funciona</a></li><li><a href="#logros">Logros</a></li><li><a href="#evidencia">Evidencia</a></li><li><a href="#futuro">Próximos pasos</a></li></ul></div></nav>
+
+<header class="hero">
+<div class="wrap">
+  <div>
+    <h1>Save Seed</h1>
+    <p class="sub">Sistema inteligente de cuidado y riego automatizado</p>
+    <p>Un jardinero robótico para la ecohuerta: mide, decide y riega sin que nadie toque un botón. Prueba el simulador y míralo reaccionar.</p>
+    <div class="team"><strong>Proyecto de Grado · 1102</strong><br>I.T.I. Centro Don Bosco &amp; Universidad Antonio Nariño<br>Andrés Miranda, Juan Guiza y Adrián Leaño</div>
+  </div>
+
+  <div class="demo" id="demo">
+    <h2>Simulador del huerto</h2>
+    <p class="hint">Mueve los sensores y mira qué decide la tarjeta.</p>
+    <div class="stage" id="stage">
+      <span class="pipe" id="pipe">Sistema en espera</span>
+      <svg class="fan" id="fan" viewBox="0 0 48 48" aria-hidden="true"><g fill="#eaf4e0"><circle cx="24" cy="24" r="4"/><path d="M24 20C20 8 30 6 28 18zM28 24C40 20 42 30 30 28zM24 28C28 40 18 42 20 30zM20 24C8 28 6 18 18 20z"/></g></svg>
+      <div class="soil"></div><div class="wet" id="wet"></div>
+      <svg class="plant" id="plant" width="110" height="120" viewBox="0 0 110 120" aria-hidden="true">
+        <path d="M55 118V50" stroke="#3f9a5c" stroke-width="6" stroke-linecap="round"/>
+        <path d="M55 70C30 70 18 52 16 34c24 0 40 12 39 36z" fill="#58b26f"/>
+        <path d="M55 52C78 52 92 36 94 16c-24 0-41 12-39 36z" fill="#7acb7e"/>
+      </svg>
+      <div class="drops" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
+    <div class="ctrls">
+      <label for="soil">Humedad de la tierra <b id="soilV">60%</b></label>
+      <input type="range" id="soil" min="0" max="100" value="60">
+      <label for="temp">Temperatura ambiente <b id="tempV">24 °C</b></label>
+      <input type="range" id="temp" min="15" max="42" value="24">
+    </div>
+    <div class="chips"><span class="chip" id="cWater">Riego por goteo</span><span class="chip" id="cFan">Ventiladores</span></div>
+    <button id="dry" type="button">Resecar la tierra y subir el calor</button>
+  </div>
+</div>
+</header>
+
+<section class="problem" id="problema">
+<div class="wrap">
+  <div>
+    <h2>El problema</h2>
+    <p><strong>¿Qué pasa en nuestra ecohuerta?</strong> Muchas personas no tienen el tiempo ni los conocimientos necesarios para cuidar las plantas. Con un clima cambiante y sin riego oportuno, los cultivos se pierden.</p>
+    <div class="crops"><span>Lavanda</span><span>Tomate</span><span>Albahaca</span></div>
+    <p>Son los cultivos que más hemos perdido por falta de agua a tiempo.</p>
+  </div>
+  <div class="wilt" aria-hidden="true">
+    <svg class="glass" viewBox="0 0 90 140"><path d="M10 8h70M10 132h70" stroke="#5b4630" stroke-width="8" stroke-linecap="round"/><path d="M16 8c0 40 20 48 29 62-9 14-29 22-29 62M74 8c0 40-20 48-29 62 9 14 29 22 29 62" fill="none" stroke="#5b4630" stroke-width="4"/><path d="M24 14h42c-2 24-14 34-21 46C38 48 26 38 24 14z" fill="#d9a441" class="sand"/><path d="M45 70v52" stroke="#d9a441" stroke-width="3"/></svg>
+    <svg width="90" height="150" viewBox="0 0 90 150"><path d="M45 148C45 110 48 80 40 50" stroke="#8a6b3c" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M40 52C20 52 10 66 12 82c20 0 28-12 28-30z" fill="#a89a4a"/><path d="M42 80C62 78 74 66 74 50c-18 2-30 12-32 30z" fill="#b8a85a"/></svg>
+    <svg width="80" height="120" viewBox="0 0 80 120"><path d="M42 118C42 90 40 70 34 48" stroke="#8a6b3c" stroke-width="5" fill="none" stroke-linecap="round"/><path d="M34 50C18 52 10 64 12 76c16 0 22-10 22-26z" fill="#9c8c44"/></svg>
+  </div>
+</div>
+</section>
+
+<section class="proposal" id="propuesta">
+<div class="wrap">
+  <svg class="dome" viewBox="0 0 300 220" aria-hidden="true">
+    <path d="M20 180A130 130 0 0 1 280 180z" fill="rgba(255,255,255,.35)" stroke="#2f7d4f" stroke-width="3"/>
+    <path d="M150 50V180M85 80L150 180 215 80M52 130L150 180 248 130M20 180 150 50 280 180" stroke="#2f7d4f" stroke-width="1.5" fill="none" opacity=".6"/>
+    <rect x="20" y="180" width="260" height="22" rx="6" fill="#5a4030"/>
+    <path d="M90 180c0-20 6-30 14-38 4 14 2 28-4 38zM205 180c0-20-6-30-14-38-4 14-2 28 4 38z" fill="#58b26f"/>
+    <rect x="125" y="125" width="50" height="55" rx="8" fill="#eaf4e0" stroke="#2f7d4f" stroke-width="3"/>
+    <rect x="137" y="140" width="26" height="26" rx="4" fill="#2f7d4f"/><path d="M143 134v6M150 134v6M157 134v6M143 166v6M150 166v6M157 166v6" stroke="#2f7d4f" stroke-width="2"/>
+  </svg>
+  <div>
+    <h2>Nuestra propuesta</h2>
+    <p>Es un <em>asistente inteligente</em> (jardinero robótico) para el huerto. Un sistema automático que vigila y riega las plantas por sí solo, para que cualquier persona pueda tener un cultivo sano sin complicaciones.</p>
+  </div>
+</div>
+</section>
+
+<section id="funciona">
+<div class="wrap">
+  <h2>¿Cómo funciona?</h2>
+  <p>Tres momentos que se repiten todo el día, sin pausa.</p>
+  <div class="flow">
+    <div class="step">
+      <svg viewBox="0 0 54 54" aria-hidden="true"><rect x="12" y="4" width="12" height="34" rx="6" fill="none" stroke="#2f86b8" stroke-width="3"/><circle cx="18" cy="42" r="8" fill="#e24b4b"/><path d="M40 12c-6 8-8 12-8 16a8 8 0 0 0 16 0c0-4-2-8-8-16z" fill="#2f86b8"/></svg>
+      <h3>Medición</h3><p>Los sensores miden la humedad de la tierra, la humedad del aire y la temperatura ambiente en tiempo real.</p>
+    </div>
+    <div class="arrow" aria-hidden="true"></div>
+    <div class="step">
+      <svg viewBox="0 0 54 54" aria-hidden="true"><rect x="8" y="8" width="38" height="38" rx="8" fill="none" stroke="#c46a8a" stroke-width="3"/><rect x="18" y="18" width="18" height="18" rx="3" fill="#c46a8a"/><path d="M14 2v6M27 2v6M40 2v6M14 46v6M27 46v6M40 46v6" stroke="#c46a8a" stroke-width="3"/></svg>
+      <h3>Decisión</h3><p>La tarjeta inteligente analiza si a la planta le falta agua o si hace demasiado calor.</p>
+    </div>
+    <div class="arrow" aria-hidden="true"></div>
+    <div class="step">
+      <svg viewBox="0 0 54 54" aria-hidden="true"><path d="M20 4c-5 7-7 10-7 13a7 7 0 0 0 14 0c0-3-2-6-7-13z" fill="#2f86b8"/><path d="M6 32h26v-6h10v6a8 8 0 0 1 0 16H32v-4H6z" fill="#2f7d4f"/></svg>
+      <h3>Acción</h3><p>Activa automáticamente el riego por goteo, los ventiladores o el sistema de temperatura según la necesidad.</p>
+    </div>
+  </div>
+</div>
+</section>
+
+<section class="wins" id="logros">
+<div class="wrap">
+  <h2>¿Qué conseguimos?</h2>
+  <div class="win">
+    <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
+    <div><h3>Control automático</h3><p>Un prototipo funcional que opera por meses sin intervención constante.</p><span class="months">Funcionando por meses</span></div>
+  </div>
+  <div class="win">
+    <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
+    <div><h3>Eficiencia y ahorro</h3><p>Riego exacto para evitar el desperdicio de agua.</p><div class="bars" aria-hidden="true"><i style="--h:18px"></i><i style="--h:30px"></i><i style="--h:44px"></i><i style="--h:60px"></i></div></div>
+  </div>
+  <div class="win">
+    <div class="ic"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12l5 5L20 6"/></svg></div>
+    <div><h3>Cuidado completo</h3><p>Estabilización del clima (calor y frío) dentro del huerto.</p></div>
+  </div>
+</div>
+</section>
+
+<section class="proof" id="evidencia">
+<div class="wrap">
+  <div>
+    <span class="live">Prueba en vivo</span>
+    <h2>La evidencia</h2>
+    <blockquote>¡Funciona en vivo!</blockquote>
+    <p>En las pruebas se puede observar cómo, en cuanto el sensor detecta que la tierra se seca, el sistema activa al instante la bomba de agua y abre el riego por goteo sin que nadie toque un solo botón.</p>
+    <p style="margin-top:1rem"><a href="#demo" style="color:var(--leaf);font-weight:600">Repite la prueba en el simulador</a></p>
+  </div>
+  <ol class="timeline">
+    <li><b>La tierra se seca</b><br><span style="color:var(--muted)">El sensor lo detecta.</span></li>
+    <li><b>La bomba se activa al instante</b><br><span style="color:var(--muted)">Sin intervención humana.</span></li>
+    <li><b>Se abre el riego por goteo</b><br><span style="color:var(--muted)">Nadie toca un solo botón.</span></li>
+  </ol>
+</div>
+</section>
+
+<section class="matters">
+<div class="wrap">
+  <h2>¿Por qué importa?</h2>
+  <p>Porque nos permite cultivar alimentos y plantas de manera fácil, ahorrando recursos valiosos como el agua y ayudando a que la comunidad tenga un huerto exitoso sin necesidad de ser expertos.</p>
+  <div class="pill-row"><span class="pill">Cultivar fácil</span><span class="pill">Ahorrar agua</span><span class="pill">Huerto para la comunidad</span></div>
+</div>
+</section>
+
+<section class="next" id="futuro">
+<div class="wrap">
+  <div class="box lim"><h3>Limitación</h3><p>Dependencia de una fuente de energía constante y conexión para calibraciones finas.</p></div>
+  <div class="box nx"><h3>Próximos pasos</h3><ul><li>Implementar el sistema en la huerta del colegio de forma más grande.</li><li>Añadir una app móvil para monitoreo remoto.</li></ul></div>
+</div>
+</section>
+
+<footer><b>Save Seed</b><br>Proyecto de Grado 1102 · I.T.I. Centro Don Bosco &amp; Universidad Antonio Nariño<br>Andrés Miranda, Juan Guiza y Adrián Leaño</footer>
+
+<script>
+(function(){
+  var soil=document.getElementById('soil'),temp=document.getElementById('temp');
+  var soilV=document.getElementById('soilV'),tempV=document.getElementById('tempV');
+  var stage=document.getElementById('stage'),plant=document.getElementById('plant'),wet=document.getElementById('wet');
+  var pipe=document.getElementById('pipe'),fan=document.getElementById('fan');
+  var cW=document.getElementById('cWater'),cF=document.getElementById('cFan');
+  var watering=false,cooling=false;
+  function render(){
+    var s=+soil.value,t=+temp.value;
+    soilV.textContent=s+'%';tempV.textContent=t+' °C';
+    wet.style.height=(10+s*.36)+'%';
+    plant.classList.toggle('dry',s<30);
+    stage.classList.toggle('hot',t>30);
+    stage.classList.toggle('on',watering);
+    fan.classList.toggle('run',cooling);
+    cW.classList.toggle('act',watering);
+    cF.classList.toggle('act',cooling);cF.classList.toggle('h',cooling);
+    pipe.textContent=watering?'Decisión: falta agua, riego activado':cooling?'Decisión: hace calor, ventiladores activados':'Sistema en espera';
+  }
+  function tick(){
+    var s=+soil.value,t=+temp.value;
+    if(s<30)watering=true;
+    if(watering){soil.value=Math.min(100,s+3);if(+soil.value>=65)watering=false;}
+    if(t>30)cooling=true;
+    if(cooling){temp.value=Math.max(15,t-.7);if(+temp.value<=27)cooling=false;}
+    render();
+  }
+  soil.addEventListener('input',render);temp.addEventListener('input',render);
+  document.getElementById('dry').addEventListener('click',function(){watering=false;cooling=false;soil.value=22;temp.value=35;render();});
+  setInterval(tick,450);render();
+})();
+</script>
+</body>
+</html>
